@@ -25,12 +25,11 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;
   }
 
-  populate_maps();
+  populate_stage_map();
   
   fseek(jpeg, 0, SEEK_END);
   int byte_size = (int) ftell(jpeg);
-  printf("ftell %d bytes\n", byte_size); 
-  
+   
   unsigned char* img_buf = (unsigned char*)malloc(byte_size);
   if (img_buf == NULL)
   {
@@ -41,7 +40,6 @@ int main(int argc, char** argv)
   fseek(jpeg, 0, SEEK_SET);
 
   byte_size = (int)fread(img_buf, sizeof(unsigned char), byte_size, jpeg);
-  printf("fread %d bytes \n", byte_size);
 
   fclose(jpeg);
 

@@ -29,18 +29,9 @@ typedef struct _jfif_stage
 } jfif_stage_t;
 
 // Fills the name and process function maps at init time.
-void populate_maps(void);
+void populate_stage_map(void);
 
 // Accesses the table and returns a stage, or NULL if not found
 bool get_stage(unsigned char marker, jfif_stage_t* out_stage); 
-
-// Process Function Signatures
-unsigned short process_func_start_of_image(unsigned char*);
-unsigned short process_func_app_segment_0(unsigned char*);
-unsigned short process_func_quant_table(unsigned char*);
-unsigned short process_func_start_of_frame(unsigned char*);
-unsigned short process_func_huffman_table(unsigned char*);
-unsigned short process_func_start_of_scan(unsigned char*);
-unsigned short process_func_end_of_image(unsigned char*);
 
 #endif
