@@ -13,7 +13,7 @@ int main(int argc, char** argv)
 {
   if (argc != 2)
   {
-    printf("no args.\n");
+    printf("Missing argument <jpeg file>.\n");
     return EXIT_FAILURE;
   }
   
@@ -30,7 +30,7 @@ int main(int argc, char** argv)
   fseek(jpeg, 0, SEEK_END);
   int byte_size = (int) ftell(jpeg);
   printf("ftell %d bytes\n", byte_size); 
-
+  
   unsigned char* img_buf = (unsigned char*)malloc(byte_size);
   if (img_buf == NULL)
   {
@@ -41,7 +41,9 @@ int main(int argc, char** argv)
   fseek(jpeg, 0, SEEK_SET);
 
   byte_size = (int)fread(img_buf, sizeof(unsigned char), byte_size, jpeg);
-  printf("fread %d bytes \n", byte_size); 
+  printf("fread %d bytes \n", byte_size);
+
+  fclose(jpeg);
 
   jfif_stage_t cur_stage;
   if (!get_stage(JFIF_SOI, &cur_stage))
@@ -50,17 +52,19 @@ int main(int argc, char** argv)
     free(img_buf);
     return EXIT_FAILURE;
   }
-  
-  for (int s = 0; s < byte_size; ++s)
+
+  // TODO(kaiyen): Maintain iterators instead of using a counter.
+  for (unsigned short s = 0; s < byte_size;)
   {
     if (img_buf[s] == JFIF_MFF && get_stage(img_buf[s+1], &cur_stage))
     {
-      printf("Processing %s...\n", cur_stage.name);
-      s = s + 2;
-      continue;
+      printf("Processing %s ", cur_stage.name);
+      s += sizeof(unsigned short);
     }
-
-    cur_stage.process_func(img_buf[s]);
+    
+    unsigned short stage_len = cur_stage.process_func(&img_buf[s]);
+    printf("(Stage size: %d Bytes)...\n", stage_len);
+    s += stage_len;
   }
 
   free(img_buf);

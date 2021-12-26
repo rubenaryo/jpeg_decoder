@@ -20,7 +20,7 @@ enum : unsigned char
 
 // Pointer to function that processes a single byte from a jpeg image.
 // Swapped around according to what section of the image we're in.
-typedef void (*process_func_t)(unsigned char);
+typedef unsigned short (*process_func_t)(unsigned char*);
 
 typedef struct _jfif_stage
 {
@@ -35,12 +35,12 @@ void populate_maps(void);
 bool get_stage(unsigned char marker, jfif_stage_t* out_stage); 
 
 // Process Function Signatures
-void process_func_start_of_image(unsigned char);
-void process_func_app_segment_0(unsigned char);
-void process_func_quant_table(unsigned char);
-void process_func_start_of_frame(unsigned char);
-void process_func_huffman_table(unsigned char);
-void process_func_start_of_scan(unsigned char);
-void process_func_end_of_image(unsigned char);
+unsigned short process_func_start_of_image(unsigned char*);
+unsigned short process_func_app_segment_0(unsigned char*);
+unsigned short process_func_quant_table(unsigned char*);
+unsigned short process_func_start_of_frame(unsigned char*);
+unsigned short process_func_huffman_table(unsigned char*);
+unsigned short process_func_start_of_scan(unsigned char*);
+unsigned short process_func_end_of_image(unsigned char*);
 
 #endif
