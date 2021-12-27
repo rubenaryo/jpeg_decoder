@@ -6,6 +6,7 @@ Author: kaiyen
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "decoder.h"
 
@@ -64,7 +65,10 @@ int main(int argc, char** argv)
 
     printf(" DONE\n");
     if (cur_stage.callback_func)
+    {
       cur_stage.callback_func();
+      putchar('\n');
+    }
     
     s += stage_len;
   }
