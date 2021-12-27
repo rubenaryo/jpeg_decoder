@@ -53,6 +53,9 @@ Each stage's information will be organized and stuffed into this thing.
 typedef struct _decode_ctx
 {
   extension_data* ext_data;
+
+  unsigned short luma_q_table[64];
+  unsigned short chrm_q_table[64];
   
   unsigned short x_density;
   unsigned short y_density;

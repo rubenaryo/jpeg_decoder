@@ -36,7 +36,7 @@ static unsigned short get_short(unsigned char* img_buf)
 static unsigned short process_func_start_of_image(unsigned char* img_buf)
 {
   // The start of image marker doesn't have a length after it and is 0 length anyway. No-op.
-  printf("(Stage Size: 0)");
+  printf("(Stage Size: 0)...");
   return 0;
 }
 
@@ -65,11 +65,41 @@ static unsigned short process_func_app_segment_0(unsigned char* img_buf)
   return stage_len;
 }
 
+static const unsigned short ZIG_ZAG_INDEX_TABLE[64] =
+{
+    0,  1,  8, 16,  9,  2,  3, 10,
+   17, 24, 32, 25, 18, 11,  4,  5,
+   12, 19, 26, 33, 40, 48, 41, 34,
+   27, 20, 13,  6,  7, 14, 21, 28,
+   35, 42, 49, 56, 57, 50, 43, 36,
+   29, 22, 15, 23, 30, 37, 44, 51,
+   58, 59, 52, 45, 38, 31, 39, 46,
+   53, 60, 61, 54, 47, 55, 62, 63,   
+};
+
 static unsigned short process_func_quant_table(unsigned char* img_buf)
 {
   unsigned short stage_len = get_short(img_buf);
   printf("(Stage Size: %d)...", stage_len);
-    
+
+  // Advance past the length.
+  img_buf += sizeof(unsigned short);
+
+  // Read destination and advance past it.
+  unsigned char dest = *img_buf++;
+  unsigned short* dest_table = NULL;
+  
+  if (dest == 0x0)
+    dest_table = ctx.luma_q_table;
+  else
+    dest_table = ctx.chrm_q_table;
+  
+  // Quantized tables are encoded according to a zig zag pattern.
+  for (unsigned char i = 0; i != 64; ++i)
+  {
+     dest_table[ZIG_ZAG_INDEX_TABLE[i]] = img_buf[i];
+  }
+  
   return stage_len;
 }
 
@@ -123,11 +153,35 @@ static void callback_app_segment_0(void)
   printf("+-------------------------+\n");
 }
 
+static void callback_quant_table(void)
+{
+  printf("+-------------------------+   +-------------------------+\n");
+  printf("|          LUMA           |   |           CHROM         |\n");
+  printf("+-------------------------+   +-------------------------+\n");
+  for (unsigned char i = 0; i != 8; ++i)
+  {
+    printf("| ");
+    for (unsigned char j = 0; j != 8; ++j)
+    {
+        printf("%02d ", ctx.luma_q_table[i*8 + j]);
+    }
+
+    printf("|   | ");
+    
+    for (unsigned char j = 0; j != 8; ++j)
+    {
+        printf("%02d ", ctx.chrm_q_table[i*8 + j]);
+    }
+    printf("|\n");
+  }
+  printf("+-------------------------+   +-------------------------+\n");
+}
+
 void populate_stage_map(void)
 {
   s_stage_map[JFIF_SOI] = {"Start of Image", process_func_start_of_image, NULL};
   s_stage_map[JFIF_AP0] = {"Application Segment 0", process_func_app_segment_0, callback_app_segment_0};
-  s_stage_map[JFIF_DQT] = {"Quantization Table", process_func_quant_table, NULL};
+  s_stage_map[JFIF_DQT] = {"Quantization Table", process_func_quant_table, callback_quant_table};
   s_stage_map[JFIF_SOF] = {"Start of Frame", process_func_start_of_frame, NULL};
   s_stage_map[JFIF_DHT] = {"Huffman Table", process_func_huffman_table, NULL};
   s_stage_map[JFIF_SOS] = {"Start of Scan", process_func_start_of_scan, NULL};
