@@ -18,14 +18,14 @@ enum : unsigned char
   JFIF_EOI = 0xD9  // End of Image
 };
 
-// Pointer to function that processes a single byte from a jpeg image.
-// Swapped around according to what section of the image we're in.
 typedef unsigned short (*process_func_t)(unsigned char*);
+typedef void (*callback_func_t)(void);
 
 typedef struct _jfif_stage
 {
   const char* name;
   process_func_t process_func;
+  callback_func_t callback_func;
 } jfif_stage_t;
 
 // Fills the name and process function maps at init time.
@@ -33,5 +33,38 @@ void populate_stage_map(void);
 
 // Accesses the table and returns a stage, or NULL if not found
 bool get_stage(unsigned char marker, jfif_stage_t* out_stage); 
+
+typedef struct _jfif_ext_data
+{
+  void* thumbnail_data;
+  unsigned char thumbnail_format;
+  unsigned char thumbnail_len_x;
+  unsigned char thumbnail_len_y;
+  
+} extension_data;
+
+/*
+----------------
+Decode Context: 
+----------------
+This is mostly responsible for holding the state.
+Each stage's information will be organized and stuffed into this thing.
+*/
+typedef struct _decode_ctx
+{
+  extension_data* ext_data;
+  
+  unsigned short x_density;
+  unsigned short y_density;
+
+  struct
+  {
+    unsigned char major;
+    unsigned char minor;
+  } jfif_ver;
+
+  unsigned char density_units;
+  
+} decode_ctx;
 
 #endif

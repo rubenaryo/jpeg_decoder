@@ -61,7 +61,11 @@ int main(int argc, char** argv)
     }
     
     unsigned short stage_len = cur_stage.process_func(&img_buf[s]);
-    printf("(Stage size: %d Bytes)...\n", stage_len);
+
+    printf(" DONE\n");
+    if (cur_stage.callback_func)
+      cur_stage.callback_func();
+    
     s += stage_len;
   }
 
