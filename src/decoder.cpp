@@ -4,15 +4,17 @@ Date:   2021/12/25
 Author: kaiyen
 ---------------------------------------------------------------------------*/
 #include "decoder.h"
+#include "huffman.h"
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unordered_map>
 
-// Static mappings from JFIF stage to its name and associated process functoin.
+// Static mappings from JFIF stage to its name and associated process function.
 static std::unordered_map<unsigned char, jfif_stage_t> s_stage_map;
 
-// Decode Context. Holds State.
+// Decode Context. Holds working state and algorithm params.
 static decode_ctx ctx;
 
 bool get_stage(unsigned char marker, jfif_stage_t* out_stage)
@@ -54,14 +56,14 @@ static unsigned short process_func_app_segment_0(unsigned char* img_buf)
 
   ctx.jfif_ver.major = img_buf[VERSION_MAJOR];
   ctx.jfif_ver.minor = img_buf[VERSION_MINOR];
-  
+
   ctx.density_units = img_buf[DENSITY_UNITS];
 
   ctx.x_density = get_short(&img_buf[DENSITY_DIM_X]);
   ctx.y_density = get_short(&img_buf[DENSITY_DIM_Y]);
 
   // Ignore thumbnail crap for now.
-  
+
   return stage_len;
 }
 
@@ -74,7 +76,7 @@ static const unsigned short ZIG_ZAG_INDEX_TABLE[64] =
    35, 42, 49, 56, 57, 50, 43, 36,
    29, 22, 15, 23, 30, 37, 44, 51,
    58, 59, 52, 45, 38, 31, 39, 46,
-   53, 60, 61, 54, 47, 55, 62, 63,   
+   53, 60, 61, 54, 47, 55, 62, 63,
 };
 
 static unsigned short process_func_quant_table(unsigned char* img_buf)
@@ -88,18 +90,18 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   // Read destination and advance past it.
   unsigned char dest = *img_buf++;
   unsigned short* dest_table = NULL;
-  
+
   if (dest == 0x0)
     dest_table = ctx.luma_q_table;
   else
     dest_table = ctx.chrm_q_table;
-  
+
   // Quantized tables are encoded according to a zig zag pattern.
   for (unsigned char i = 0; i != 64; ++i)
   {
     dest_table[ZIG_ZAG_INDEX_TABLE[i]] = img_buf[i];
   }
-  
+
   return stage_len;
 }
 
@@ -113,21 +115,79 @@ static unsigned short process_func_start_of_frame(unsigned char* img_buf)
 
 static unsigned short process_func_huffman_table(unsigned char* img_buf)
 {
-  static const unsigned char HT_COUNT_MASK = 0xE0;
-  static const unsigned char HT_TYPE_MASK  = 0010;
-  
-  unsigned short stage_len = get_short(img_buf);
+  static const unsigned char HT_COUNT_MASK = 0x0F;
+  static const unsigned char HT_TYPE_MASK  = 0x10;
+
+  unsigned stage_len = (unsigned)get_short(img_buf);
   printf("(Stage Size: %d)...", stage_len);
 
   img_buf += sizeof(unsigned short);
 
-  unsigned char ht_byte = *img_buf;
+  // Header information
+  unsigned char ht_header = *img_buf;
 
-  unsigned char ht_count = ((ht_byte & HT_COUNT_MASK));
-  unsigned char ht_type  = ((ht_byte & HT_TYPE_MASK));
+  unsigned char ht_count = ((ht_header & HT_COUNT_MASK));
+  unsigned char ht_type  = ((ht_header & HT_TYPE_MASK) >> 4);
 
-  printf("\nht_byte:\t%02x\nht_count:\t%x\nht_type:\t%x\n", ht_byte, ht_count, ht_type);
-  
+  printf("\nht_header:\t0x%02x\nht_count:\t0x%02x\nht_type:\t0x%02x\n", ht_header, ht_count, ht_type);
+
+  ++img_buf;
+
+  unsigned char ht_lengths[16];
+  memcpy(&ht_lengths, img_buf, 16);
+
+  printf("ht_lengths:\t{ ");
+
+  // Extract all the huff table items
+  img_buf += 16;
+
+  unsigned ht_lengths_sum = 0;
+
+  for (unsigned ht_length_temp, i = 0; i != 16; ++i)
+  {
+    ht_length_temp = ht_lengths[i];
+    ht_lengths_sum += ht_length_temp;
+    printf("%d ", ht_length_temp);
+  }
+  printf("}\n");
+
+  unsigned char* ht_items_arr = (unsigned char*)malloc(ht_lengths_sum);
+  for (unsigned ht_length_temp, i = 0, j = 0; i != 16; ++i)
+  {
+    ht_length_temp = ht_lengths[i];
+    if (ht_length_temp == 0)
+      continue;
+
+    // Length isn't zero. Read that many items from the image and put it into the items array.
+    memcpy(&ht_items_arr[j], &img_buf[j], ht_length_temp);
+    j += ht_length_temp;
+  }
+
+  printf("ht_items(%d):\t{ ", ht_lengths_sum);
+  for (unsigned i = 0; i != ht_lengths_sum; ++i)
+  {
+    printf("%d ", ht_items_arr[i]);
+  }
+  printf("}\n");
+
+  huff_node_t* true_root = (huff_node_t*)malloc(sizeof(huff_node_t));
+  huff_node_init(true_root, 0xFF);
+
+  unsigned item_counter = 0;
+  for (unsigned i = 0; i != 16; ++i)
+  {
+    const unsigned char code_len = i + 1;
+    for (unsigned j = 0; j != ht_lengths[i]; ++j)
+    {
+      if (!huff_table_insert(&true_root, code_len, 0, ht_items_arr[item_counter++]))
+      {
+        printf("ERROR: Failed to build huff table. val:%d\n", ht_items_arr[item_counter++]);
+      }
+    }
+  }
+
+  free(ht_items_arr);
+
   return stage_len;
 }
 
@@ -135,7 +195,7 @@ static unsigned short process_func_start_of_scan(unsigned char* img_buf)
 {
   unsigned short stage_len = get_short(img_buf);
   printf("(Stage Size: %d)...", stage_len);
-  
+
   return stage_len;
 }
 
@@ -143,7 +203,7 @@ static unsigned short process_func_end_of_image(unsigned char* img_buf)
 {
   unsigned short stage_len = get_short(img_buf);
   printf("(Stage Size: %d)...", stage_len);
-  
+
   return stage_len;
 }
 
@@ -151,7 +211,7 @@ static void callback_app_segment_0(void)
 {
   char buf[16];
   snprintf(buf, 16, "%d.%d", ctx.jfif_ver.major, ctx.jfif_ver.minor);
-  
+
   printf("+-------------------------+\n");
   printf("| JPEG Image Information  |\n");
   printf("+-------------------------+\n");
@@ -179,7 +239,7 @@ static void callback_quant_table(void)
     }
 
     printf("|   | ");
-    
+
     for (unsigned char j = 0; j != 8; ++j)
     {
         printf("%03d ", ctx.chrm_q_table[i*8 + j]);

@@ -32,7 +32,7 @@ typedef struct _jfif_stage
 void populate_stage_map(void);
 
 // Accesses the table and returns a stage, or NULL if not found
-bool get_stage(unsigned char marker, jfif_stage_t* out_stage); 
+bool get_stage(unsigned char marker, jfif_stage_t* out_stage);
 
 // TODO(kaiyen): I don't really give a shit about thumbnails right now
 typedef struct _jfif_ext_data
@@ -41,12 +41,12 @@ typedef struct _jfif_ext_data
   unsigned char thumbnail_format;
   unsigned char thumbnail_len_x;
   unsigned char thumbnail_len_y;
-  
+
 } extension_data_t;
 
 /*
 ----------------
-Decode Context: 
+Decode Context:
 ----------------
 This is mostly responsible for holding the state.
 Each stage's information will be organized and stuffed into this thing.
@@ -57,7 +57,7 @@ typedef struct _decode_ctx
 
   unsigned short luma_q_table[64];
   unsigned short chrm_q_table[64];
-  
+
   unsigned short x_density;
   unsigned short y_density;
 
@@ -68,7 +68,7 @@ typedef struct _decode_ctx
   } jfif_ver;
 
   unsigned char density_units;
-  
+
 } decode_ctx;
 
 #endif
