@@ -7,12 +7,12 @@ Author: kaiyen
 
 #include <stdio.h>
 
-#define ENABLE_LOG 0
+#define ENABLE_HT_LOG 0
 
-#if ENABLE_LOG
-#define LOG(...) printf(__VA_ARGS__)
+#if ENABLE_HT_LOG
+#define HT_LOG(...) printf(__VA_ARGS__)
 #else
-#define LOG(...)
+#define HT_LOG(...)
 #endif
 
 static void alloc_and_init_huff_node(huff_node_t** root, unsigned char val)
@@ -33,41 +33,39 @@ bool huff_table_insert(huff_node_t** root, const unsigned char code_len, unsigne
   {
     if (cur_pos < code_len) // We need to go deeper
     {
-      LOG("Created an intermediate node at lvl: %d\n", cur_pos);
-      // Create an intermediate node.
-      alloc_and_init_huff_node(root, 0xFF);
+      HT_LOG("Created an intermediate node at lvl: %d\n", cur_pos);
+      alloc_and_init_huff_node(root, INTERMEDIATE_NODE_VAL);
     }
     else if (cur_pos == code_len) // Success. Early out.
     {
       // TODO(kaiyen): I know how many items there are, so
       // it might make more sense to just alloc all those huff leaf nodes at once in a single array.
-
-      LOG("Inserted %d at pos:%d.\n", val, cur_pos);
+      HT_LOG("Inserted %d at pos:%d.\n", val, cur_pos);
       alloc_and_init_huff_node(root, val);
       return true;
     }
     else // We went too far.
     {
-      LOG("Went too far! val:%d cur_pos:%d code_len:%d\n", val, cur_pos, code_len);
+      HT_LOG("Went too far! val:%d cur_pos:%d code_len:%d\n", val, cur_pos, code_len);
       return false;
     }
   }
   else if (cur_pos != 0 && (*root)->left == NULL && (*root)->right == NULL)
   {
-    LOG("Cannot insert %d. Found a node with val: %d. cur_pos:%d.\n", val, (*root)->val, cur_pos);
+    HT_LOG("Cannot insert %d. Found a leaf node with val: %d. cur_pos:%d.\n", val, (*root)->val, cur_pos);
     return false;
   }
 
   huff_node_t** left_child  = &(*root)->left;
   huff_node_t** right_child = &(*root)->right;
 
-  LOG("Attempting insert left for %d. cur_pos:%d. code_len:%d.\n", val, cur_pos, code_len);
+  HT_LOG("Attempting insert left for %d. cur_pos:%d. code_len:%d.\n", val, cur_pos, code_len);
   if (huff_table_insert(left_child, code_len, cur_pos+1, val))
   {
     return true;
   }
 
-  LOG("Attempting insert right for %d. cur_pos:%d. code_len:%d.\n", val, cur_pos, code_len);
+  HT_LOG("Attempting insert right for %d. cur_pos:%d. code_len:%d.\n", val, cur_pos, code_len);
   if (huff_table_insert(right_child, code_len, cur_pos+1, val))
   {
     return true;
@@ -81,7 +79,7 @@ unsigned char huff_table_lookup(huff_node_t* root, const unsigned code, const un
   if (root == NULL)
   {
     printf("ERROR! Root is NULL! code:%d, cur_shift:%d\n", code, cur_shift);
-    return 0xFF;
+    return INTERMEDIATE_NODE_VAL;
   }
 
   if (cur_shift == code_len) // We're at the right level. This should be the final stop.
@@ -89,6 +87,7 @@ unsigned char huff_table_lookup(huff_node_t* root, const unsigned code, const un
     return root->val;
   }
 
+  // TODO(kaiyen): Can this be done better?
   const unsigned char bit = (code >> (code_len - 1 - cur_shift)) & 1;
 
   if (bit == 0)
@@ -99,4 +98,17 @@ unsigned char huff_table_lookup(huff_node_t* root, const unsigned code, const un
   {
     return huff_table_lookup(root->right, code, code_len, cur_shift + 1);
   }
+}
+
+void huff_table_cleanup(huff_node_t* root)
+{
+  if (root == NULL)
+  {
+    return;
+  }
+
+  huff_table_cleanup(root->left);
+  huff_table_cleanup(root->right);
+
+  free(root);
 }

@@ -6,6 +6,8 @@ Author: kaiyen
 #ifndef DECODER_H
 #define DECODER_H
 
+#include "huffman.h"
+
 enum : unsigned char
 {
   JFIF_MFF = 0xFF, // Marker Byte
@@ -32,7 +34,7 @@ typedef struct _jfif_stage
 void populate_stage_map(void);
 
 // Accesses the table and returns a stage, or NULL if not found
-bool get_stage(unsigned char marker, jfif_stage_t* out_stage); 
+bool get_stage(unsigned char marker, jfif_stage_t* out_stage);
 
 // TODO(kaiyen): I don't really give a shit about thumbnails right now
 typedef struct _jfif_ext_data
@@ -41,12 +43,12 @@ typedef struct _jfif_ext_data
   unsigned char thumbnail_format;
   unsigned char thumbnail_len_x;
   unsigned char thumbnail_len_y;
-  
+
 } extension_data_t;
 
 /*
 ----------------
-Decode Context: 
+Decode Context:
 ----------------
 This is mostly responsible for holding the state.
 Each stage's information will be organized and stuffed into this thing.
@@ -54,10 +56,11 @@ Each stage's information will be organized and stuffed into this thing.
 typedef struct _decode_ctx
 {
   extension_data_t* extension_data;
+  huff_node_t* huffman_tables[4];
 
   unsigned short luma_q_table[64];
   unsigned short chrm_q_table[64];
-  
+
   unsigned short x_density;
   unsigned short y_density;
 
@@ -68,7 +71,7 @@ typedef struct _decode_ctx
   } jfif_ver;
 
   unsigned char density_units;
-  
+
 } decode_ctx;
 
 #endif

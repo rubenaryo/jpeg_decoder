@@ -171,7 +171,7 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
   printf("}\n");
 
   huff_node_t* true_root = (huff_node_t*)malloc(sizeof(huff_node_t));
-  huff_node_init(true_root, 0xFF);
+  huff_node_init(true_root, INTERMEDIATE_NODE_VAL);
 
   unsigned item_counter = 0;
   for (unsigned i = 0; i != 16; ++i)
@@ -186,6 +186,7 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
     }
   }
 
+  ctx.huffman_tables[ht_header] = true_root;
   free(ht_items_arr);
 
   return stage_len;
@@ -203,6 +204,12 @@ static unsigned short process_func_end_of_image(unsigned char* img_buf)
 {
   unsigned short stage_len = get_short(img_buf);
   printf("(Stage Size: %d)...", stage_len);
+
+  // Cleanup the decode context
+  for (unsigned char i = 0; i != 4; ++i)
+  {
+    huff_table_cleanup(ctx.huffman_tables[i]);
+  }
 
   return stage_len;
 }

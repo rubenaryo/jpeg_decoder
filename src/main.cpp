@@ -8,7 +8,7 @@ Author: kaiyen
 #include <stdio.h>
 
 #include "decoder.h"
-  
+
 int main(int argc, char** argv)
 {
   if (argc != 2)
@@ -16,7 +16,7 @@ int main(int argc, char** argv)
     printf("Missing argument <jpeg file>.\n");
     return EXIT_FAILURE;
   }
-  
+
   FILE* jpeg = fopen(argv[1], "rb");
 
   if (jpeg == NULL)
@@ -26,17 +26,17 @@ int main(int argc, char** argv)
   }
 
   populate_stage_map();
-  
+
   fseek(jpeg, 0, SEEK_END);
   int byte_size = (int) ftell(jpeg);
-   
+
   unsigned char* img_buf = (unsigned char*)malloc(byte_size);
   if (img_buf == NULL)
   {
     printf("Failed to allocate buffer for image.\n");
     return EXIT_FAILURE;
   }
-  
+
   fseek(jpeg, 0, SEEK_SET);
 
   byte_size = (int)fread(img_buf, sizeof(unsigned char), byte_size, jpeg);
@@ -59,7 +59,7 @@ int main(int argc, char** argv)
       printf("> Processing %s ", cur_stage.name);
       s += sizeof(unsigned short);
     }
-    
+
     unsigned short stage_len = cur_stage.process_func(&img_buf[s]);
 
     putchar('\n');
@@ -68,7 +68,7 @@ int main(int argc, char** argv)
       cur_stage.callback_func();
       putchar('\n');
     }
-    
+
     s += stage_len;
   }
 

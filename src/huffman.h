@@ -18,10 +18,14 @@ struct _huff_node
   unsigned char val;
 };
 
-bool huff_table_insert(huff_node_t** root, const unsigned char code_len, unsigned char cur_pos, const unsigned char val);
-
 void huff_node_init(huff_node_t* node, unsigned char val);
 
+bool huff_table_insert(huff_node_t** root, const unsigned char code_len, unsigned char cur_pos, const unsigned char val);
+
 bool huff_table_lookup(huff_node_t* root, const unsigned code, const unsigned code_len, const unsigned cur_shift, unsigned char* out_val);
+
+void huff_table_cleanup(huff_node_t* root);
+
+static const unsigned char INTERMEDIATE_NODE_VAL = 0xcd;
 
 #endif
