@@ -60,7 +60,7 @@ Decode Context:
 This is mostly responsible for holding the state.
 Each stage's information will be organized and stuffed into this thing.
 */
-typedef struct _decode_ctx
+typedef struct _decode_context
 {
   extension_data_t* extension_data;
   huff_node_t* huffman_tables[4];
@@ -84,6 +84,6 @@ typedef struct _decode_ctx
   unsigned char density_units;
   unsigned char bits_per_sample;
 
-} decode_ctx;
+} decode_context_t;
 
 #endif

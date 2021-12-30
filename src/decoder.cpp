@@ -4,6 +4,8 @@ Date:   2021/12/25
 Author: kaiyen
 ---------------------------------------------------------------------------*/
 #include "decoder.h"
+
+#include "dct_utils.h"
 #include "huffman.h"
 
 #include <stdlib.h>
@@ -15,7 +17,7 @@ Author: kaiyen
 static std::unordered_map<unsigned char, jfif_stage_t> s_stage_map;
 
 // Decode Context. Holds working state and algorithm params.
-static decode_ctx ctx;
+static decode_context_t ctx;
 
 bool get_stage(unsigned char marker, jfif_stage_t* out_stage)
 {
@@ -135,7 +137,7 @@ static unsigned short process_func_start_of_frame(unsigned char* img_buf)
 
   if (!(num_components == 1 || num_components == 3))
   {
-    printf("WARNING:Weird number of components: %d\n", num_components);
+    printf("WARNING: Weird number of components: %d\n", num_components);
   }
 
   static const char* COMP_ID_TO_NAME[] = {"Undefined", "Y", "Cb", "Cr", "I", "Q"};
@@ -163,6 +165,8 @@ static unsigned short process_func_start_of_frame(unsigned char* img_buf)
     printf("  Vertical Sample Factor:\t%d\n", component_it->sample_factor_vert);
     printf("  Horizontal Sample Factor:\t%d\n", component_it->sample_factor_horiz);
   }
+
+  init_inverse_dct_table(ctx.bits_per_sample);
 
   return stage_len;
 }
@@ -251,6 +255,37 @@ static unsigned short process_func_start_of_scan(unsigned char* img_buf)
   unsigned short stage_len = get_short(img_buf);
   printf("(Stage Size: %d)...", stage_len);
 
+
+  // offsets holds the position of the 0xFF
+  unsigned* offsets = (unsigned*)malloc(sizeof(unsigned)*1024);
+  unsigned offsets_counter = 0;
+  //img_buf;
+  unsigned i = 0;
+  while (1)
+  {
+    if (img_buf[i] == 0xFF)
+    {
+      if(img_buf[i+1] != 0x00)
+      {
+        // Reached the end of the section.
+        printf("End of scan section. i = %d\n", i);
+        stage_len = i;
+        offsets[offsets_counter] = i; // add it to the end of the array, but without incrementing the counter.
+        break;
+      }
+      offsets[offsets_counter++] = i;
+    }
+    ++i;
+  }
+
+  // Now that we know the true size of the section. We can cleanse the image data of all 0x00's.
+  for(i = 0; i != offsets_counter; ++i)
+  {
+    unsigned offset = offsets[i];
+    memmove(&img_buf[offset+1], &img_buf[offset+2], offsets[i+1] - offset-1);
+  }
+
+  free(offsets);
   return stage_len;
 }
 
@@ -293,17 +328,18 @@ static void callback_quant_table(void)
   printf("+---------------------------------+   +---------------------------------+\n");
   for (unsigned char i = 0; i != 8; ++i)
   {
+    const unsigned char offset = i * 8;
     printf("| ");
     for (unsigned char j = 0; j != 8; ++j)
     {
-        printf("%03d ", ctx.luma_q_table[i*8 + j]);
+        printf("%03d ", ctx.luma_q_table[offset + j]);
     }
 
     printf("|   | ");
 
     for (unsigned char j = 0; j != 8; ++j)
     {
-        printf("%03d ", ctx.chrm_q_table[i*8 + j]);
+        printf("%03d ", ctx.chrm_q_table[offset + j]);
     }
     printf("|\n");
   }
