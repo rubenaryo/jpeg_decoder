@@ -92,9 +92,13 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   unsigned short* dest_table = NULL;
 
   if (dest == 0x0)
+  {
     dest_table = ctx.luma_q_table;
+  }
   else
+  {
     dest_table = ctx.chrm_q_table;
+  }
 
   // Quantized tables are encoded according to a zig zag pattern.
   for (unsigned char i = 0; i != 64; ++i)
@@ -109,6 +113,56 @@ static unsigned short process_func_start_of_frame(unsigned char* img_buf)
 {
   unsigned short stage_len = get_short(img_buf);
   printf("(Stage Size: %d)...", stage_len);
+
+  img_buf += sizeof(unsigned short);
+
+  unsigned char precision = *img_buf;
+  ++img_buf;
+
+  printf("\nImage Bits/Sample: %d\n", precision);
+  ctx.bits_per_sample = precision;
+
+  unsigned short img_width = get_short(img_buf);
+  img_buf += sizeof(unsigned short);
+  unsigned short img_height = get_short(img_buf);
+  img_buf += sizeof(unsigned short);
+
+  printf("Image Dimensions: %dx%d\n", img_width, img_height);
+  ctx.x_length = img_width;
+  ctx.y_length = img_height;
+
+  unsigned char num_components = *img_buf++;
+
+  if (!(num_components == 1 || num_components == 3))
+  {
+    printf("WARNING:Weird number of components: %d\n", num_components);
+  }
+
+  static const char* COMP_ID_TO_NAME[] = {"Undefined", "Y", "Cb", "Cr", "I", "Q"};
+
+  ctx.components = (jfif_component_t*)malloc(sizeof(jfif_component_t) * num_components);
+  jfif_component_t* component_it;
+  for (unsigned char component_id, sample_factors, q_table_id, i = 0; i != num_components; ++i)
+  {
+    // Sample factor masks
+    static const unsigned char SF_VERT_MASK  = 0x0F; // 0b00001111
+    static const unsigned char SF_HORIZ_MASK = 0xF0; // 0b11110000
+
+    component_id   = *img_buf++;
+    sample_factors = *img_buf++;
+    q_table_id     = *img_buf++;
+
+    component_it = &ctx.components[i];
+    component_it->quant_table_id = q_table_id;
+    component_it->sample_factor_vert  = (sample_factors & SF_VERT_MASK );
+    component_it->sample_factor_horiz = (sample_factors & SF_HORIZ_MASK) >> 4;
+
+    printf("Component %d:\n", i);
+    printf("  Component:\t\t\t%s\n", COMP_ID_TO_NAME[component_id]);
+    printf("  Quantization Table ID:\t%d\n", component_it->quant_table_id);
+    printf("  Vertical Sample Factor:\t%d\n", component_it->sample_factor_vert);
+    printf("  Horizontal Sample Factor:\t%d\n", component_it->sample_factor_horiz);
+  }
 
   return stage_len;
 }
@@ -220,7 +274,7 @@ static void callback_app_segment_0(void)
   snprintf(buf, 16, "%d.%d", ctx.jfif_ver.major, ctx.jfif_ver.minor);
 
   printf("+-------------------------+\n");
-  printf("| JPEG Image Information  |\n");
+  printf("| JPEG Header Information |\n");
   printf("+-------------------------+\n");
   printf("| JFIF %-19s|\n", buf);
 

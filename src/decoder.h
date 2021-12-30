@@ -36,6 +36,13 @@ void populate_stage_map(void);
 // Accesses the table and returns a stage, or NULL if not found
 bool get_stage(unsigned char marker, jfif_stage_t* out_stage);
 
+typedef struct _jfif_component
+{
+  unsigned char quant_table_id;
+  unsigned char sample_factor_vert;
+  unsigned char sample_factor_horiz;
+} jfif_component_t;
+
 // TODO(kaiyen): I don't really give a shit about thumbnails right now
 typedef struct _jfif_ext_data
 {
@@ -57,9 +64,13 @@ typedef struct _decode_ctx
 {
   extension_data_t* extension_data;
   huff_node_t* huffman_tables[4];
+  jfif_component_t* components;
 
   unsigned short luma_q_table[64];
   unsigned short chrm_q_table[64];
+
+  unsigned short x_length;
+  unsigned short y_length;
 
   unsigned short x_density;
   unsigned short y_density;
@@ -71,6 +82,7 @@ typedef struct _decode_ctx
   } jfif_ver;
 
   unsigned char density_units;
+  unsigned char bits_per_sample;
 
 } decode_ctx;
 
