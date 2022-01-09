@@ -117,7 +117,7 @@ static void print_short(const char* elem_fmt, const void* item) { printf(elem_fm
 static void print_float(const char* elem_fmt, const void* item) { printf(elem_fmt, *(const float*)item);}
 static void print_int(const char* elem_fmt, const void* item) { printf(elem_fmt, *(const int*)item);}
 
-void print_block(const char* header, const char* elem_fmt, void* block, size_t block_side_len, enum print_t type)
+void print_block(const char* header, const char* elem_fmt, void* block, size_t block_side_len, print_t type)
 {
   typedef void (*print_elem_func_t)(const char*, const void*);
   static print_elem_func_t PT_FUNCS[PT_COUNT] =

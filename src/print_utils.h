@@ -8,14 +8,14 @@ Author: kaiyen
 
 #include <stddef.h>
 
-enum print_t
+typedef enum _print
 {
   PT_BYTE,
   PT_SHORT,
   PT_FLOAT,
   PT_INT,
   PT_COUNT
-};
+} print_t;
 
 struct _decode_context;
 struct _jfif_component;
@@ -33,6 +33,6 @@ void print_huffman_info(unsigned char ht_header, unsigned char ht_count, unsigne
 void print_component_info(struct _jfif_component* component, unsigned char component_counter, unsigned char component_id);
 
 // Prints a single block to the console, and a caller specified header string
-void print_block(const char* header, const char* elem_fmt, void* block, size_t block_side_len, enum print_t type);
+void print_block(const char* header, const char* elem_fmt, void* block, size_t block_side_len, print_t type);
 
 #endif
