@@ -15,4 +15,7 @@ int dc_ac_value_decode(int read_bits, unsigned bit_count);
 
 // Widely accessible table for zig zag indices.
 unsigned short get_zig_zagged_index(unsigned char idx);
+
+// Reverses the endianness of the first two bytes of img_buf and returns as a short.
+unsigned short get_short(unsigned char* img_buf);
 #endif

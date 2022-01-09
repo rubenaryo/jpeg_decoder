@@ -127,6 +127,7 @@ unsigned bits_to_dct_block(unsigned char*const block, const huff_node_t** huff_t
     }
     putchar('\n');
   }
+  putchar('\n');
 
   return cur_pos;
 }

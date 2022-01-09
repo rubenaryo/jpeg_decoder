@@ -71,13 +71,6 @@ int main(int argc, char** argv)
 
     unsigned short stage_len = cur_stage.process_func(&img_buf[s]);
 
-    putchar('\n');
-    if (cur_stage.callback_func)
-    {
-      cur_stage.callback_func();
-      putchar('\n');
-    }
-
     s += stage_len;
   }
 

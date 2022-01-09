@@ -53,3 +53,8 @@ unsigned short get_zig_zagged_index(unsigned char idx)
 {
   return ZIG_ZAG_INDEX_TABLE[idx];
 }
+
+unsigned short get_short(unsigned char* img_buf)
+{
+  return ((unsigned short)img_buf[0] << 8) | img_buf[1];
+}

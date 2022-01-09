@@ -7,6 +7,7 @@ Author: kaiyen
 
 #include "dct_utils.h"
 #include "huffman.h"
+#include "print_utils.h"
 #include "utils.h"
 
 #include <stdlib.h>
@@ -63,22 +64,28 @@ bool get_stage(unsigned char marker, jfif_stage_t* out_stage)
   return false;
 }
 
-static unsigned short get_short(unsigned char* img_buf)
+// Returns the segment length from the buffer's next two bytes and prints it out.
+unsigned short get_segment_len(unsigned char* img_buf)
 {
-  return ((unsigned short)img_buf[0] << 8) | img_buf[1];
+  if (img_buf == NULL)
+    return 0;
+
+  const unsigned short segment_len = get_short(img_buf);
+  printf("(Segment Length: %d)...\n", segment_len);
+
+  return segment_len;
 }
 
 static unsigned short process_func_start_of_image(unsigned char* img_buf)
 {
   // The start of image marker doesn't have a length after it and is 0 length anyway. No-op.
-  printf("(Stage Size: 0)...");
+  printf("(Segment Length: 0)...\n");
   return 0;
 }
 
 static unsigned short process_func_app_segment_0(unsigned char* img_buf)
 {
-  unsigned short stage_len = get_short(img_buf);
-  printf("(Stage Size: %d)...", stage_len);
+  unsigned short segment_len = get_segment_len(img_buf);
 
   // Initialize the decode context.
   init_decode_ctx();
@@ -98,14 +105,15 @@ static unsigned short process_func_app_segment_0(unsigned char* img_buf)
   ctx.x_density = get_short(&img_buf[DENSITY_DIM_X]);
   ctx.y_density = get_short(&img_buf[DENSITY_DIM_Y]);
 
+  print_jpeg_header(&ctx, jfif_ver.major, jfif_ver.minor);
+
   // Ignore thumbnail crap for now.
-  return stage_len;
+  return segment_len;
 }
 
 static unsigned short process_func_quant_table(unsigned char* img_buf)
 {
-  unsigned short stage_len = get_short(img_buf);
-  printf("(Stage Size: %d)...", stage_len);
+  unsigned short segment_len = get_segment_len(img_buf);
 
   // Advance past the length.
   img_buf += sizeof(unsigned short);
@@ -120,7 +128,7 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   unsigned char dest = qt_info & QT_ID_MASK;
   unsigned char precision = (qt_info & QT_PRECISION_MASK) >> 4;
 
-  printf("\n qt_info:\t0x%02X\n", qt_info);
+  printf("qt_info:\t0x%02X\n", qt_info);
   if (dest == 0x0)
   {
     dest_table = ctx.luma_q_table;
@@ -133,7 +141,7 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   // Quantized tables are encoded according to a zig zag pattern.
   if (precision == 0)
   {
-    printf("\n Each element in the quant table is 1 byte.\n");
+    printf("Each element in the quant table is 1 byte.\n");
 
     for (unsigned char i = 0; i != 64; ++i)
     {
@@ -142,7 +150,7 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   }
   else
   {
-    printf("\n Each element in the quant table is 2 bytes.\n");
+    printf("Each element in the quant table is 2 bytes.\n");
 
     for (unsigned char i = 0; i != 64; ++i, img_buf += sizeof(unsigned short))
     {
@@ -150,20 +158,21 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
     }
   }
 
-  return stage_len;
+  print_quant_tables(&ctx);
+
+  return segment_len;
 }
 
 static unsigned short process_func_start_of_frame(unsigned char* img_buf)
 {
-  unsigned short stage_len = get_short(img_buf);
-  printf("(Stage Size: %d)...", stage_len);
+  unsigned short segment_len = get_segment_len(img_buf);
 
   img_buf += sizeof(unsigned short);
 
   unsigned char precision = *img_buf;
   ++img_buf;
 
-  printf("\nImage Bits/Sample: %d\n", precision);
+  printf("Image Bits/Sample: %d\n", precision);
   ctx.bits_per_sample = precision;
 
   unsigned short img_width = get_short(img_buf);
@@ -210,7 +219,7 @@ static unsigned short process_func_start_of_frame(unsigned char* img_buf)
 
   init_inverse_dct_table(ctx.bits_per_sample);
 
-  return stage_len;
+  return segment_len;
 }
 
 static unsigned short process_func_huffman_table(unsigned char* img_buf)
@@ -219,8 +228,7 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
   static const unsigned char HT_COUNT_MASK = 0x0F;
   static const unsigned char HT_TYPE_MASK  = 0x10; // Bits 5-7 Unused
 
-  unsigned stage_len = (unsigned)get_short(img_buf);
-  printf("(Stage Size: %d)...", stage_len);
+  unsigned segment_len = (unsigned)get_segment_len(img_buf);
 
   img_buf += sizeof(unsigned short);
 
@@ -230,7 +238,7 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
   unsigned char ht_count = ((ht_header & HT_COUNT_MASK));
   unsigned char ht_type  = ((ht_header & HT_TYPE_MASK) >> 4);
 
-  printf("\nht_header:\t0x%02x\nht_count:\t0x%02x\nht_type:\t0x%02x\n", ht_header, ht_count, ht_type);
+  printf("ht_header:\t0x%02x\nht_count:\t0x%02x\nht_type:\t0x%02x\n", ht_header, ht_count, ht_type);
 
   unsigned char ht_lengths[16];
   memcpy(&ht_lengths, img_buf, 16);
@@ -299,7 +307,7 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
 
   free(ht_items_arr);
 
-  return stage_len;
+  return segment_len;
 }
 
 static unsigned short process_func_start_of_scan(unsigned char* img_buf)
@@ -320,7 +328,7 @@ static unsigned short process_func_start_of_scan(unsigned char* img_buf)
   // offsets holds the position of the 0xFF.
     size_t temp_buffer_size = ctx.x_length * ctx.y_length; // TODO(kaiyen): Maybe store the buffer length in the context and use it for this?
   unsigned* offsets = (unsigned*)malloc(sizeof(unsigned)*temp_buffer_size);
-  unsigned stage_len, offsets_counter = 0;
+  unsigned segment_len, offsets_counter = 0;
   unsigned i = 0;
   while (offsets_counter < temp_buffer_size) // We shouldn't really ever reach this point.
   {
@@ -329,7 +337,7 @@ static unsigned short process_func_start_of_scan(unsigned char* img_buf)
       if(img_buf[i+1] != 0x00)
       {
         // Reached the end of the section. This means we're at the marker for EOI.
-        stage_len = i;
+        segment_len = i;
 
         // add it to the end of the array, but without incrementing the counter.
         // by doing this we can copy the final span of the image too. from the last real offset to the EOI marker.
@@ -341,7 +349,7 @@ static unsigned short process_func_start_of_scan(unsigned char* img_buf)
     ++i;
   }
 
-  printf("Image Size: %d)...", stage_len);
+  printf("Image Size: %d)...", segment_len);
 
   // Now that we know the true size of the section. We can cleanse the image data of all 0x00's.
   for(i = 0; i != offsets_counter; ++i)
@@ -384,13 +392,12 @@ static unsigned short process_func_start_of_scan(unsigned char* img_buf)
 
   free(scratch_block);
   free(offsets);
-  return stage_len+sos_header_len;
+  return segment_len+sos_header_len;
 }
 
 static unsigned short process_func_end_of_image(unsigned char* img_buf)
 {
-  unsigned short stage_len = get_short(img_buf);
-  printf("(Stage Size: %d)...", stage_len);
+  unsigned short segment_len = get_segment_len(img_buf);
 
   // Cleanup the decode context
   for (unsigned char i = 0; i != 2; ++i)
@@ -402,57 +409,14 @@ static unsigned short process_func_end_of_image(unsigned char* img_buf)
       huff_table_cleanup(ctx.huffman_tables_chroma[i]);
   }
 
-  return stage_len;
-}
-
-static void callback_app_segment_0(void)
-{
-  char buf[16];
-  snprintf(buf, 16, "%d.%d", jfif_ver.major, jfif_ver.minor);
-
-  printf("+-------------------------+\n");
-  printf("| JPEG Header Information |\n");
-  printf("+-------------------------+\n");
-  printf("| JFIF %-19s|\n", buf);
-
-  snprintf(buf, 16, "%1d", ctx.density_units);
-  printf("| Density Units: %-9s|\n", buf);
-
-  snprintf(buf, 16, "%dx%d", ctx.x_density, ctx.y_density);
-  printf("| Density: %-15s|\n", buf);
-  printf("+-------------------------+\n");
-}
-
-static void callback_quant_table(void)
-{
-  printf("+---------------------------------+   +---------------------------------+\n");
-  printf("|              LUMA               |   |              CHROMA             |\n");
-  printf("+---------------------------------+   +---------------------------------+\n");
-  for (unsigned char i = 0; i != 8; ++i)
-  {
-    const unsigned char offset = i * 8;
-    printf("| ");
-    for (unsigned char j = 0; j != 8; ++j)
-    {
-        printf("%03d ", ctx.luma_q_table[offset + j]);
-    }
-
-    printf("|   | ");
-
-    for (unsigned char j = 0; j != 8; ++j)
-    {
-        printf("%03d ", ctx.chrm_q_table[offset + j]);
-    }
-    printf("|\n");
-  }
-  printf("+---------------------------------+   +---------------------------------+\n");
+  return segment_len;
 }
 
 void populate_stage_map(void)
 {
   s_stage_map[JFIF_SOI] = {"Start of Image", process_func_start_of_image, NULL};
-  s_stage_map[JFIF_AP0] = {"Application Segment 0", process_func_app_segment_0, callback_app_segment_0};
-  s_stage_map[JFIF_DQT] = {"Quantization Table", process_func_quant_table, callback_quant_table};
+  s_stage_map[JFIF_AP0] = {"Application Segment 0", process_func_app_segment_0, NULL};
+  s_stage_map[JFIF_DQT] = {"Quantization Table", process_func_quant_table, NULL};
   s_stage_map[JFIF_SOF] = {"Start of Frame", process_func_start_of_frame, NULL};
   s_stage_map[JFIF_DHT] = {"Huffman Table", process_func_huffman_table, NULL};
   s_stage_map[JFIF_SOS] = {"Start of Scan", process_func_start_of_scan, NULL};
@@ -461,10 +425,9 @@ void populate_stage_map(void)
 
 static unsigned short process_func_default(unsigned char* img_buf)
 {
-  unsigned short stage_len = (unsigned short)get_short(img_buf);
-  printf("(Stage Size: %d)...", stage_len);
+  unsigned short segment_len = get_segment_len(img_buf);
 
-  return stage_len;
+  return segment_len;
 }
 
 jfif_stage_t get_default_stage(unsigned char marker)
