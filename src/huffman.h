@@ -6,6 +6,8 @@ Author: kaiyen
 #ifndef HUFFMAN_H
 #define HUFFMAN_H
 
+#include <stdbool.h>
+
 typedef struct _huff_node huff_node_t;
 
 struct _huff_node

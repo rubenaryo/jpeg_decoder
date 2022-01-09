@@ -8,6 +8,8 @@ Author: kaiyen
 
 #include "huffman.h"
 
+#include <stdbool.h>
+
 // JFIF Markers
 enum
 {
@@ -56,8 +58,8 @@ Decode Context:
 This is mostly responsible for holding the state.
 Each stage's information will be organized and stuffed into this thing.
 */
-static const unsigned char HUFF_TABLES_PER_CHANNEL_TYPE = 2;
-static const unsigned char QUANT_TABLE_SIZE = 64;
+#define HUFF_TABLES_PER_CHANNEL_TYPE 2
+#define QUANT_TABLE_SIZE 64
 typedef struct _decode_context
 {
   extension_data_t* extension_data;
