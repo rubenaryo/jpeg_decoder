@@ -60,6 +60,20 @@ void print_quant_tables(decode_context_t* ctx)
   printf("+---------------------------------+   +---------------------------------+\n");
 }
 
+void print_component_info(struct _jfif_component* component, unsigned char component_counter, unsigned char component_id)
+{
+  if (component == NULL)
+    return;
+
+  static const char* COMP_ID_TO_NAME[] = {"Undefined", "Y", "Cb", "Cr", "I", "Q"};
+
+  printf("Component %d:\n", component_counter);
+  printf("  Component:\t\t\t%s\n", COMP_ID_TO_NAME[component_id]);
+  printf("  Quantization Table ID:\t%d\n", component->quant_table_id);
+  printf("  Vertical Sample Factor:\t%d\n", component->sample_factor_vert);
+  printf("  Horizontal Sample Factor:\t%d\n", component->sample_factor_horiz);
+}
+
 void print_huffman_info(unsigned char ht_header, unsigned char ht_count, unsigned char ht_type, unsigned char* ht_lengths, unsigned char* ht_items, unsigned char ht_items_count)
 {
   if (ht_lengths == NULL || ht_items == NULL)

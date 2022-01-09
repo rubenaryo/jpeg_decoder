@@ -191,8 +191,6 @@ static unsigned short process_func_start_of_frame(unsigned char* img_buf)
     printf("WARNING: Weird number of components: %d\n", num_components);
   }
 
-  static const char* COMP_ID_TO_NAME[] = {"Undefined", "Y", "Cb", "Cr", "I", "Q"};
-
   ctx.components = (jfif_component_t*)malloc(sizeof(jfif_component_t) * num_components);
   jfif_component_t* component_it;
   for (unsigned char component_id, sample_factors, q_table_id, i = 0; i != num_components; ++i)
@@ -210,11 +208,7 @@ static unsigned short process_func_start_of_frame(unsigned char* img_buf)
     component_it->sample_factor_vert  = (sample_factors & SF_VERT_MASK );
     component_it->sample_factor_horiz = (sample_factors & SF_HORIZ_MASK) >> 4;
 
-    printf("Component %d:\n", i);
-    printf("  Component:\t\t\t%s\n", COMP_ID_TO_NAME[component_id]);
-    printf("  Quantization Table ID:\t%d\n", component_it->quant_table_id);
-    printf("  Vertical Sample Factor:\t%d\n", component_it->sample_factor_vert);
-    printf("  Horizontal Sample Factor:\t%d\n", component_it->sample_factor_horiz);
+    print_component_info(component_it, i, component_id);
   }
 
   init_inverse_dct_table(ctx.bits_per_sample);
