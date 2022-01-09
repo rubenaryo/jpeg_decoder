@@ -8,7 +8,8 @@ Author: kaiyen
 
 #include "huffman.h"
 
-enum : unsigned char
+// JFIF Markers
+enum
 {
   JFIF_MFF = 0xFF, // Marker Byte
   JFIF_SOI = 0xD8, // Start of Image
@@ -21,22 +22,15 @@ enum : unsigned char
 };
 
 typedef unsigned short (*process_func_t)(unsigned char*);
-typedef void (*callback_func_t)(void);
-
-typedef struct _jfif_stage
-{
-  const char* name;
-  process_func_t process_func;
-  callback_func_t callback_func;
-} jfif_stage_t;
 
 // Fills the name and process function maps at init time.
 void populate_stage_map(void);
 
 // Accesses the table and returns a stage, or NULL if not found
-bool get_stage(unsigned char marker, jfif_stage_t* out_stage);
+bool get_segment_process_func(unsigned char marker, process_func_t* out_process_func, char* out_segment_name);
 
-jfif_stage_t get_default_stage(unsigned char marker);
+// Returns the default stage, usually for unsupported markers.
+void get_default_stage(unsigned char marker, process_func_t* out_process_func, char* out_segment_name);
 
 typedef struct _jfif_component
 {

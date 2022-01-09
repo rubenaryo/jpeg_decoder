@@ -25,8 +25,6 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;
   }
 
-  populate_stage_map();
-
   fseek(jpeg, 0, SEEK_END);
   int byte_size = (int) ftell(jpeg);
 
@@ -43,8 +41,9 @@ int main(int argc, char** argv)
 
   fclose(jpeg);
 
-  jfif_stage_t cur_stage;
-  if (!get_stage(JFIF_SOI, &cur_stage))
+  process_func_t process_func = NULL;
+  char segment_name_buf[64];
+  if (!get_segment_process_func(JFIF_SOI, &process_func, segment_name_buf))
   {
     printf("Failed to get initial stage.\n");
     free(img_buf);
@@ -56,20 +55,20 @@ int main(int argc, char** argv)
   {
     if (img_buf[s] == JFIF_MFF)
     {
-      if (get_stage(img_buf[s+1], &cur_stage))
+      if (get_segment_process_func(img_buf[s+1], &process_func, segment_name_buf))
       {
-        printf("> Processing %s ", cur_stage.name);
+        printf("> Processing %s ", segment_name_buf);
       }
       else
       {
-        cur_stage = get_default_stage(img_buf[s+1]);
-        printf("> Skipping %s ", cur_stage.name);
+        get_default_stage(img_buf[s+1], &process_func, segment_name_buf);
+        printf("> Skipping %s ", segment_name_buf);
       }
 
       s += sizeof(unsigned short);
     }
 
-    unsigned short stage_len = cur_stage.process_func(&img_buf[s]);
+    unsigned short stage_len = process_func(&img_buf[s]);
 
     s += stage_len;
   }

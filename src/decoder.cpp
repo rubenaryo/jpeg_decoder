@@ -13,10 +13,6 @@ Author: kaiyen
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unordered_map>
-
-// Static mappings from JFIF stage to its name and associated process function.
-static std::unordered_map<unsigned char, jfif_stage_t> s_stage_map;
 
 // Decode Context. Holds working state and algorithm params.
 static decode_context_t ctx;
@@ -49,19 +45,6 @@ static void init_decode_ctx()
 #else
   memset(&ctx, 0, sizeof(decode_context_t));
 #endif
-}
-
-bool get_stage(unsigned char marker, jfif_stage_t* out_stage)
-{
-  auto itStage = s_stage_map.find(marker);
-
-  if (itStage != s_stage_map.end())
-  {
-    memcpy(out_stage, &(itStage->second), sizeof(jfif_stage_t));
-    return true;
-  }
-
-  return false;
 }
 
 // Returns the segment length from the buffer's next two bytes and prints it out.
@@ -390,15 +373,42 @@ static unsigned short process_func_end_of_image(unsigned char* img_buf)
   return segment_len;
 }
 
-void populate_stage_map(void)
+bool get_segment_process_func(unsigned char marker, process_func_t* out_process_func, char* out_segment_name)
 {
-  s_stage_map[JFIF_SOI] = {"Start of Image", process_func_start_of_image, NULL};
-  s_stage_map[JFIF_AP0] = {"Application Segment 0", process_func_app_segment_0, NULL};
-  s_stage_map[JFIF_DQT] = {"Quantization Table", process_func_quant_table, NULL};
-  s_stage_map[JFIF_SOF] = {"Start of Frame", process_func_start_of_frame, NULL};
-  s_stage_map[JFIF_DHT] = {"Huffman Table", process_func_huffman_table, NULL};
-  s_stage_map[JFIF_SOS] = {"Start of Scan", process_func_start_of_scan, NULL};
-  s_stage_map[JFIF_EOI] = {"End of Image", process_func_end_of_image, NULL};
+  switch (marker)
+  {
+    case JFIF_SOI:
+      *out_process_func = process_func_start_of_image;
+      strcpy(out_segment_name, "Start of Image");
+      break;
+    case JFIF_AP0:
+      *out_process_func = process_func_app_segment_0;
+      strcpy(out_segment_name, "App Segment 0");
+      break;
+    case JFIF_DQT:
+      *out_process_func = process_func_quant_table;
+      strcpy(out_segment_name, "Quantization Table");
+      break;
+    case JFIF_SOF:
+      *out_process_func = process_func_start_of_frame;
+      strcpy(out_segment_name, "Start of Frame");
+      break;
+    case JFIF_DHT:
+      *out_process_func = process_func_huffman_table;
+      strcpy(out_segment_name, "Huffman Table");
+      break;
+    case JFIF_SOS:
+      *out_process_func = process_func_start_of_scan;
+      strcpy(out_segment_name, "Start of Scan");
+      break;
+    case JFIF_EOI:
+      *out_process_func = process_func_end_of_image;
+      strcpy(out_segment_name, "End of Image");
+      break;
+    default:
+      return false;
+  }
+  return true;
 }
 
 static unsigned short process_func_default(unsigned char* img_buf)
@@ -408,10 +418,8 @@ static unsigned short process_func_default(unsigned char* img_buf)
   return segment_len;
 }
 
-jfif_stage_t get_default_stage(unsigned char marker)
+void get_default_stage(unsigned char marker, process_func_t* out_process_func, char* out_segment_name)
 {
-  static char formatted_name[32];
-
-  sprintf(formatted_name, "Unsupported Stage: 0xFF%X", marker);
-  return {(const char*)formatted_name, process_func_default, NULL};
+  *out_process_func = process_func_default;
+  sprintf(out_segment_name, "Unsupported Stage: 0xFF%X", marker);
 }
