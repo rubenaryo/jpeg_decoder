@@ -238,45 +238,29 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
   unsigned char ht_count = ((ht_header & HT_COUNT_MASK));
   unsigned char ht_type  = ((ht_header & HT_TYPE_MASK) >> 4);
 
-  printf("ht_header:\t0x%02x\nht_count:\t0x%02x\nht_type:\t0x%02x\n", ht_header, ht_count, ht_type);
-
   unsigned char ht_lengths[16];
   memcpy(&ht_lengths, img_buf, 16);
-
-  printf("ht_lengths:\t{ ");
 
   // Extract all the huff table items
   img_buf += 16;
 
   unsigned ht_lengths_sum = 0;
+  for (unsigned i = 0; i != 16; ++i)
+    ht_lengths_sum += ht_lengths[i];
 
-  for (unsigned ht_length_temp, i = 0; i != 16; ++i)
-  {
-    ht_length_temp = ht_lengths[i];
-    ht_lengths_sum += ht_length_temp;
-    printf("%d ", ht_length_temp);
-  }
-  printf("}\n");
-
-  unsigned char* ht_items_arr = (unsigned char*)malloc(ht_lengths_sum);
-  unsigned j = 0;
-  for (unsigned ht_length_temp, i = 0; i != 16; ++i)
+  unsigned char* ht_items = (unsigned char*)malloc(ht_lengths_sum);
+  for (unsigned ht_length_temp, j = 0, i = 0; i != 16; ++i)
   {
     ht_length_temp = ht_lengths[i];
     if (ht_length_temp == 0)
       continue;
 
     // Length isn't zero. Read that many items from the image and put it into the items array.
-    memcpy(&ht_items_arr[j], &img_buf[j], ht_length_temp);
+    memcpy(&ht_items[j], &img_buf[j], ht_length_temp);
     j += ht_length_temp;
   }
 
-  printf("ht_items(%d):\t{ ", ht_lengths_sum);
-  for (unsigned i = 0; i != ht_lengths_sum; ++i)
-  {
-    printf("%d ", ht_items_arr[i]);
-  }
-  printf("}\n");
+  print_huffman_info(ht_header, ht_count, ht_type, ht_lengths, ht_items, ht_lengths_sum);
 
   huff_node_t* true_root = (huff_node_t*)malloc(sizeof(huff_node_t));
   huff_node_init(true_root, INTERMEDIATE_NODE_VAL);
@@ -287,9 +271,9 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
     const unsigned char code_len = i + 1;
     for (unsigned k = 0; k != ht_lengths[i]; ++k)
     {
-      if (!huff_table_insert(&true_root, code_len, 0, ht_items_arr[item_counter++]))
+      if (!huff_table_insert(&true_root, code_len, 0, ht_items[item_counter++]))
       {
-        printf("ERROR: Failed to build huff table. val:%d\n", ht_items_arr[item_counter++]);
+        printf("ERROR: Failed to build huff table. val:%d\n", ht_items[item_counter++]);
       }
     }
   }
@@ -305,7 +289,7 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
     ctx.huffman_tables_chroma[ht_type] = true_root;
   }
 
-  free(ht_items_arr);
+  free(ht_items);
 
   return segment_len;
 }

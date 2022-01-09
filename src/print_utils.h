@@ -14,7 +14,7 @@ void print_jpeg_header(struct _decode_context* ctx, unsigned char jfif_major, un
 // Prints the quantization tables held in the decoder context
 void print_quant_tables(struct _decode_context* ctx);
 
-// Returns the segment length from the buffer's next two bytes and prints it out.
-unsigned short get_segment_len(unsigned char* img_buf);
+// Prints the huffman table header, lengths, and items.
+void print_huffman_info(unsigned char ht_header, unsigned char ht_count, unsigned char ht_type, unsigned char* ht_lengths, unsigned char* ht_items, unsigned char ht_items_count);
 
 #endif
