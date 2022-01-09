@@ -4,6 +4,8 @@ Date:   2021/12/29
 Author: kaiyen
 ---------------------------------------------------------------------------*/
 #include "dct_utils.h"
+
+#include "print_utils.h"
 #include "utils.h"
 
 #undef __STRICT_ANSI__
@@ -44,18 +46,7 @@ void init_inverse_dct_table(unsigned char precision)
     }
   }
 
-  printf("\nInverse DCT Table:\n");
-  for (i = 0; i != precision; ++i)
-  {
-    putchar(' ');
-    offset = i * precision;
-    for (j = 0; j != precision; ++j)
-    {
-      printf("%+02.2f ", s_inverse_dct_table[offset + j]);
-    }
-    putchar('\n');
-  }
-
+  print_block("Inverse DCT Table", "%+02.2f ", s_inverse_dct_table, precision, PT_FLOAT);
 }
 
 // huff_tables is assumed to be a non-null array of 2 huffman table pointers.
@@ -113,24 +104,7 @@ unsigned bits_to_dct_block(unsigned char*const block, const huff_node_t** huff_t
     scratch_block[get_zig_zagged_index(i)] = decoded_ac_val;
   }
 
-  // NOw,the table should be filled. We can do inverse DCT.
-//  for (unsigned char i = 0; i != 64; ++i)
-  //{
-    //scratch_block[i] *= ctx->luma_q_table[i];// * (unsigned)(s_inverse_dct_table[i] * 255.0f);
- // }
-
-  printf("\nFinal DCT Block::\n");
-  for (unsigned char i = 0; i != 8; ++i)
-  {
-    putchar(' ');
-    unsigned offset = i * 8;
-    for (unsigned char j = 0; j != 8; ++j)
-    {
-      printf("%+04d ", scratch_block[offset + j]);
-    }
-    putchar('\n');
-  }
-  putchar('\n');
+  print_block("Final DCT Block", "%+04d ", scratch_block, 8, PT_INT);
 
   return cur_pos;
 }

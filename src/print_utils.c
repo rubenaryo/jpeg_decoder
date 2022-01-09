@@ -10,6 +10,7 @@ Author: kaiyen
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 void print_jpeg_header(decode_context_t* ctx, unsigned char jfif_major, unsigned char jfif_minor)
 {
@@ -32,10 +33,21 @@ void print_jpeg_header(decode_context_t* ctx, unsigned char jfif_major, unsigned
   printf("+-------------------------+\n");
 }
 
-void print_quant_tables(decode_context_t* ctx)
+void print_quant_tables(decode_context_t* ctx, unsigned char qt_info, unsigned char qt_precision)
 {
   if (ctx == NULL)
     return;
+
+  printf("qt_info:\t0x%03X\n", qt_info);
+
+  if (qt_precision == 0)
+  {
+    printf("Each element in the quant table is 1 byte.\n");
+  }
+  else
+  {
+    printf("Each element in the quant table is 2 bytes.\n");
+  }
 
   printf("+---------------------------------+   +---------------------------------+\n");
   printf("|              LUMA               |   |              CHROMA             |\n");
@@ -96,5 +108,53 @@ void print_huffman_info(unsigned char ht_header, unsigned char ht_count, unsigne
     printf("%d ", ht_items[i]);
   }
   printf("}\n");
+
+}
+
+
+static void print_byte(const char* elem_fmt, const void* item) { printf(elem_fmt, *(const unsigned char*)item);}
+static void print_short(const char* elem_fmt, const void* item) { printf(elem_fmt, *(const short*)item);}
+static void print_float(const char* elem_fmt, const void* item) { printf(elem_fmt, *(const float*)item);}
+static void print_int(const char* elem_fmt, const void* item) { printf(elem_fmt, *(const int*)item);}
+
+void print_block(const char* header, const char* elem_fmt, void* block, size_t block_side_len, enum print_t type)
+{
+  typedef void (*print_elem_func_t)(const char*, const void*);
+  static print_elem_func_t PT_FUNCS[PT_COUNT] =
+  {
+    print_byte,
+    print_short,
+    print_float,
+    print_int
+  };
+
+  static size_t PT_SIZES[PT_COUNT] =
+  {
+    sizeof(unsigned char),
+    sizeof(short),
+    sizeof(float),
+    sizeof(int)
+  };
+
+  if (header == NULL || elem_fmt == NULL || block == NULL || block_side_len == 0 || type < 0 || type > PT_COUNT)
+    return;
+
+  print_elem_func_t print_func = PT_FUNCS[type];
+  size_t elem_size = PT_SIZES[type];
+
+  const void* block_it = NULL;
+
+  printf("\n%s:\n", header);
+  for (size_t offset, j, i = 0; i != block_side_len; ++i)
+  {
+    putchar(' ');
+    offset = i * block_side_len;
+    for (j = 0; j != block_side_len; ++j)
+    {
+      block_it = (const unsigned char*)block + (elem_size * (offset + j));
+      print_func(elem_fmt, block_it);
+    }
+    putchar('\n');
+  }
 
 }

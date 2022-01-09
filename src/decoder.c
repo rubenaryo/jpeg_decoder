@@ -124,8 +124,6 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   // Quantized tables are encoded according to a zig zag pattern.
   if (precision == 0)
   {
-    printf("Each element in the quant table is 1 byte.\n");
-
     for (unsigned char i = 0; i != 64; ++i)
     {
       dest_table[get_zig_zagged_index(i)] = img_buf[i];
@@ -133,15 +131,13 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   }
   else
   {
-    printf("Each element in the quant table is 2 bytes.\n");
-
     for (unsigned char i = 0; i != 64; ++i, img_buf += sizeof(unsigned short))
     {
       dest_table[get_zig_zagged_index(i)] = get_short(img_buf);
     }
   }
 
-  print_quant_tables(&ctx);
+  print_quant_tables(&ctx, qt_info, precision);
 
   return segment_len;
 }
