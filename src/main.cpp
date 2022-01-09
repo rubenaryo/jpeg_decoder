@@ -54,9 +54,18 @@ int main(int argc, char** argv)
   // TODO(kaiyen): Maintain iterators instead of using a counter.
   for (unsigned short s = 0; s < byte_size;)
   {
-    if (img_buf[s] == JFIF_MFF && get_stage(img_buf[s+1], &cur_stage))
+    if (img_buf[s] == JFIF_MFF)
     {
-      printf("> Processing %s ", cur_stage.name);
+      if (get_stage(img_buf[s+1], &cur_stage))
+      {
+        printf("> Processing %s ", cur_stage.name);
+      }
+      else
+      {
+        cur_stage = get_default_stage(img_buf[s+1]);
+        printf("> Skipping %s ", cur_stage.name);
+      }
+
       s += sizeof(unsigned short);
     }
 

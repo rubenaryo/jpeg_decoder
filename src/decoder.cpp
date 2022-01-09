@@ -7,6 +7,7 @@ Author: kaiyen
 
 #include "dct_utils.h"
 #include "huffman.h"
+#include "utils.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,6 +19,36 @@ static std::unordered_map<unsigned char, jfif_stage_t> s_stage_map;
 
 // Decode Context. Holds working state and algorithm params.
 static decode_context_t ctx;
+
+// JFIF Version
+static struct
+{
+  unsigned char major;
+  unsigned char minor;
+} jfif_ver;
+
+static void init_decode_ctx()
+{
+#if 1
+  ctx.extension_data = NULL;
+
+  memset(&ctx.huffman_tables_luma, 0, sizeof(void*)*HUFF_TABLES_PER_CHANNEL_TYPE);
+  memset(&ctx.huffman_tables_chroma, 0, sizeof(void*)*HUFF_TABLES_PER_CHANNEL_TYPE);
+
+  ctx.components = NULL;
+
+  memset(&ctx.luma_q_table, 0, sizeof(unsigned short)*QUANT_TABLE_SIZE);
+  memset(&ctx.chrm_q_table, 0, sizeof(unsigned short)*QUANT_TABLE_SIZE);
+
+  ctx.x_length = ctx.y_length = 0;
+
+  ctx.x_density = ctx.y_density = 0;
+
+  ctx.density_units = ctx.bits_per_sample = ctx.num_components = 0;
+#else
+  memset(&ctx, 0, sizeof(decode_context_t));
+#endif
+}
 
 bool get_stage(unsigned char marker, jfif_stage_t* out_stage)
 {
@@ -49,6 +80,9 @@ static unsigned short process_func_app_segment_0(unsigned char* img_buf)
   unsigned short stage_len = get_short(img_buf);
   printf("(Stage Size: %d)...", stage_len);
 
+  // Initialize the decode context.
+  init_decode_ctx();
+
   // App0 offsets
   static const unsigned char VERSION_MAJOR = sizeof(unsigned short) + (sizeof(unsigned char) * 5);
   static const unsigned char VERSION_MINOR = VERSION_MAJOR + sizeof(unsigned char);
@@ -56,8 +90,8 @@ static unsigned short process_func_app_segment_0(unsigned char* img_buf)
   static const unsigned char DENSITY_DIM_X = DENSITY_UNITS + sizeof(unsigned char);
   static const unsigned char DENSITY_DIM_Y = DENSITY_DIM_X + sizeof(unsigned short);
 
-  ctx.jfif_ver.major = img_buf[VERSION_MAJOR];
-  ctx.jfif_ver.minor = img_buf[VERSION_MINOR];
+  jfif_ver.major = img_buf[VERSION_MAJOR];
+  jfif_ver.minor = img_buf[VERSION_MINOR];
 
   ctx.density_units = img_buf[DENSITY_UNITS];
 
@@ -65,21 +99,8 @@ static unsigned short process_func_app_segment_0(unsigned char* img_buf)
   ctx.y_density = get_short(&img_buf[DENSITY_DIM_Y]);
 
   // Ignore thumbnail crap for now.
-
   return stage_len;
 }
-
-static const unsigned short ZIG_ZAG_INDEX_TABLE[64] =
-{
-    0,  1,  8, 16,  9,  2,  3, 10,
-   17, 24, 32, 25, 18, 11,  4,  5,
-   12, 19, 26, 33, 40, 48, 41, 34,
-   27, 20, 13,  6,  7, 14, 21, 28,
-   35, 42, 49, 56, 57, 50, 43, 36,
-   29, 22, 15, 23, 30, 37, 44, 51,
-   58, 59, 52, 45, 38, 31, 39, 46,
-   53, 60, 61, 54, 47, 55, 62, 63,
-};
 
 static unsigned short process_func_quant_table(unsigned char* img_buf)
 {
@@ -90,9 +111,16 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   img_buf += sizeof(unsigned short);
 
   // Read destination and advance past it.
-  unsigned char dest = *img_buf++;
+  unsigned char qt_info = *img_buf++;
   unsigned short* dest_table = NULL;
 
+  static const unsigned char QT_ID_MASK = 0x0F;
+  static const unsigned char QT_PRECISION_MASK = 0xF0;
+
+  unsigned char dest = qt_info & QT_ID_MASK;
+  unsigned char precision = (qt_info & QT_PRECISION_MASK) >> 4;
+
+  printf("\n qt_info:\t0x%02X\n", qt_info);
   if (dest == 0x0)
   {
     dest_table = ctx.luma_q_table;
@@ -103,9 +131,23 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   }
 
   // Quantized tables are encoded according to a zig zag pattern.
-  for (unsigned char i = 0; i != 64; ++i)
+  if (precision == 0)
   {
-    dest_table[ZIG_ZAG_INDEX_TABLE[i]] = img_buf[i];
+    printf("\n Each element in the quant table is 1 byte.\n");
+
+    for (unsigned char i = 0; i != 64; ++i)
+    {
+      dest_table[get_zig_zagged_index(i)] = img_buf[i];
+    }
+  }
+  else
+  {
+    printf("\n Each element in the quant table is 2 bytes.\n");
+
+    for (unsigned char i = 0; i != 64; ++i, img_buf += sizeof(unsigned short))
+    {
+      dest_table[get_zig_zagged_index(i)] = get_short(img_buf);
+    }
   }
 
   return stage_len;
@@ -173,8 +215,9 @@ static unsigned short process_func_start_of_frame(unsigned char* img_buf)
 
 static unsigned short process_func_huffman_table(unsigned char* img_buf)
 {
+  // HT Header Masks
   static const unsigned char HT_COUNT_MASK = 0x0F;
-  static const unsigned char HT_TYPE_MASK  = 0x10;
+  static const unsigned char HT_TYPE_MASK  = 0x10; // Bits 5-7 Unused
 
   unsigned stage_len = (unsigned)get_short(img_buf);
   printf("(Stage Size: %d)...", stage_len);
@@ -182,14 +225,12 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
   img_buf += sizeof(unsigned short);
 
   // Header information
-  unsigned char ht_header = *img_buf;
+  unsigned char ht_header = *img_buf++;
 
   unsigned char ht_count = ((ht_header & HT_COUNT_MASK));
   unsigned char ht_type  = ((ht_header & HT_TYPE_MASK) >> 4);
 
   printf("\nht_header:\t0x%02x\nht_count:\t0x%02x\nht_type:\t0x%02x\n", ht_header, ht_count, ht_type);
-
-  ++img_buf;
 
   unsigned char ht_lengths[16];
   memcpy(&ht_lengths, img_buf, 16);
@@ -210,7 +251,8 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
   printf("}\n");
 
   unsigned char* ht_items_arr = (unsigned char*)malloc(ht_lengths_sum);
-  for (unsigned ht_length_temp, i = 0, j = 0; i != 16; ++i)
+  unsigned j = 0;
+  for (unsigned ht_length_temp, i = 0; i != 16; ++i)
   {
     ht_length_temp = ht_lengths[i];
     if (ht_length_temp == 0)
@@ -235,7 +277,7 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
   for (unsigned i = 0; i != 16; ++i)
   {
     const unsigned char code_len = i + 1;
-    for (unsigned j = 0; j != ht_lengths[i]; ++j)
+    for (unsigned k = 0; k != ht_lengths[i]; ++k)
     {
       if (!huff_table_insert(&true_root, code_len, 0, ht_items_arr[item_counter++]))
       {
@@ -244,7 +286,17 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
     }
   }
 
-  ctx.huffman_tables[ht_header] = true_root;
+  if (ht_count == 0x0) // Luma
+  {
+    printf("Storing Luma Huff Table %d into the Decoder Context.\n", ht_type);
+    ctx.huffman_tables_luma[ht_type] = true_root;
+  }
+  else
+  {
+    printf("Storing Chroma Huff Table %d into the Decoder Context.\n", ht_type);
+    ctx.huffman_tables_chroma[ht_type] = true_root;
+  }
+
   free(ht_items_arr);
 
   return stage_len;
@@ -252,25 +304,36 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
 
 static unsigned short process_func_start_of_scan(unsigned char* img_buf)
 {
-  unsigned short stage_len = get_short(img_buf);
-  printf("(Stage Size: %d)...", stage_len);
+  unsigned short sos_header_len = get_short(img_buf);
+  printf("(Header Size: %d, ", sos_header_len);
 
+  // Process SOS header: Selectors and Tables
 
-  // offsets holds the position of the 0xFF
-  unsigned* offsets = (unsigned*)malloc(sizeof(unsigned)*1024);
-  unsigned offsets_counter = 0;
-  //img_buf;
+  if (sos_header_len != 12)
+  {
+    printf("\nWARNING: Something weird is going on. %d\n", sos_header_len);
+    return sos_header_len;
+  };
+
+  img_buf += sos_header_len;
+
+  // offsets holds the position of the 0xFF.
+    size_t temp_buffer_size = ctx.x_length * ctx.y_length; // TODO(kaiyen): Maybe store the buffer length in the context and use it for this?
+  unsigned* offsets = (unsigned*)malloc(sizeof(unsigned)*temp_buffer_size);
+  unsigned stage_len, offsets_counter = 0;
   unsigned i = 0;
-  while (1)
+  while (offsets_counter < temp_buffer_size) // We shouldn't really ever reach this point.
   {
     if (img_buf[i] == 0xFF)
     {
       if(img_buf[i+1] != 0x00)
       {
-        // Reached the end of the section.
-        printf("End of scan section. i = %d\n", i);
+        // Reached the end of the section. This means we're at the marker for EOI.
         stage_len = i;
-        offsets[offsets_counter] = i; // add it to the end of the array, but without incrementing the counter.
+
+        // add it to the end of the array, but without incrementing the counter.
+        // by doing this we can copy the final span of the image too. from the last real offset to the EOI marker.
+        offsets[offsets_counter] = i;
         break;
       }
       offsets[offsets_counter++] = i;
@@ -278,15 +341,50 @@ static unsigned short process_func_start_of_scan(unsigned char* img_buf)
     ++i;
   }
 
+  printf("Image Size: %d)...", stage_len);
+
   // Now that we know the true size of the section. We can cleanse the image data of all 0x00's.
   for(i = 0; i != offsets_counter; ++i)
   {
+    // TODO(kaiyen): Maybe better to just alloc a temporary buffer and then memcpy?
     unsigned offset = offsets[i];
     memmove(&img_buf[offset+1], &img_buf[offset+2], offsets[i+1] - offset-1);
   }
 
+  // Scratch block for DCT block building
+  const size_t block_size = sizeof(unsigned) * QUANT_TABLE_SIZE;
+  unsigned* scratch_block = (unsigned*)malloc(block_size);
+  memset(scratch_block, 0, block_size);
+
+  unsigned luma_dc_val = 0, chroma_dc_val = 0;
+  unsigned x, y, x_blocks = ctx.x_length/8, y_blocks = ctx.y_length/8;
+  unsigned offset;
+  printf("\n%d x %d pixels being divided into %d x %d blocks.\n", ctx.x_length, ctx.y_length, x_blocks, y_blocks);
+  for (y = 0; y != y_blocks; ++y)
+  {
+    offset = y*ctx.y_length*8;
+    for (x = 0; x != x_blocks; ++x)
+    {
+      // Luminance
+      unsigned char*const block = &img_buf[offset + x*8];
+      unsigned chm_offset = bits_to_dct_block(block, (const huff_node_t**)ctx.huffman_tables_luma, scratch_block, &luma_dc_val);
+
+      // TODO: IDCT (DCT #3)
+
+      memset(scratch_block, 0, block_size);
+
+      // Chrominance
+      unsigned char*const block2 = block + chm_offset;
+      unsigned unused = bits_to_dct_block(block2, (const huff_node_t**)ctx.huffman_tables_chroma, scratch_block, &chroma_dc_val);
+      unused++;
+
+      memset(scratch_block, 0, block_size);
+    }
+  }
+
+  free(scratch_block);
   free(offsets);
-  return stage_len;
+  return stage_len+sos_header_len;
 }
 
 static unsigned short process_func_end_of_image(unsigned char* img_buf)
@@ -295,9 +393,13 @@ static unsigned short process_func_end_of_image(unsigned char* img_buf)
   printf("(Stage Size: %d)...", stage_len);
 
   // Cleanup the decode context
-  for (unsigned char i = 0; i != 4; ++i)
+  for (unsigned char i = 0; i != 2; ++i)
   {
-    huff_table_cleanup(ctx.huffman_tables[i]);
+    if (ctx.huffman_tables_luma[i])
+      huff_table_cleanup(ctx.huffman_tables_luma[i]);
+
+    if (ctx.huffman_tables_chroma[i])
+      huff_table_cleanup(ctx.huffman_tables_chroma[i]);
   }
 
   return stage_len;
@@ -306,7 +408,7 @@ static unsigned short process_func_end_of_image(unsigned char* img_buf)
 static void callback_app_segment_0(void)
 {
   char buf[16];
-  snprintf(buf, 16, "%d.%d", ctx.jfif_ver.major, ctx.jfif_ver.minor);
+  snprintf(buf, 16, "%d.%d", jfif_ver.major, jfif_ver.minor);
 
   printf("+-------------------------+\n");
   printf("| JPEG Header Information |\n");
@@ -355,4 +457,20 @@ void populate_stage_map(void)
   s_stage_map[JFIF_DHT] = {"Huffman Table", process_func_huffman_table, NULL};
   s_stage_map[JFIF_SOS] = {"Start of Scan", process_func_start_of_scan, NULL};
   s_stage_map[JFIF_EOI] = {"End of Image", process_func_end_of_image, NULL};
+}
+
+static unsigned short process_func_default(unsigned char* img_buf)
+{
+  unsigned short stage_len = (unsigned short)get_short(img_buf);
+  printf("(Stage Size: %d)...", stage_len);
+
+  return stage_len;
+}
+
+jfif_stage_t get_default_stage(unsigned char marker)
+{
+  static char formatted_name[32];
+
+  sprintf(formatted_name, "Unsupported Stage: 0xFF%X", marker);
+  return {(const char*)formatted_name, process_func_default, NULL};
 }

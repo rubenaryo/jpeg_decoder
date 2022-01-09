@@ -36,6 +36,8 @@ void populate_stage_map(void);
 // Accesses the table and returns a stage, or NULL if not found
 bool get_stage(unsigned char marker, jfif_stage_t* out_stage);
 
+jfif_stage_t get_default_stage(unsigned char marker);
+
 typedef struct _jfif_component
 {
   unsigned char quant_table_id;
@@ -60,14 +62,20 @@ Decode Context:
 This is mostly responsible for holding the state.
 Each stage's information will be organized and stuffed into this thing.
 */
+static const unsigned char HUFF_TABLES_PER_CHANNEL_TYPE = 2;
+static const unsigned char QUANT_TABLE_SIZE = 64;
 typedef struct _decode_context
 {
   extension_data_t* extension_data;
-  huff_node_t* huffman_tables[4];
+
+  // By convention: Index 0 is DC, Index 1 is AC
+  // chroma tables are NULL for greyscale images.
+  huff_node_t* huffman_tables_luma[HUFF_TABLES_PER_CHANNEL_TYPE];
+  huff_node_t* huffman_tables_chroma[HUFF_TABLES_PER_CHANNEL_TYPE];
   jfif_component_t* components;
 
-  unsigned short luma_q_table[64];
-  unsigned short chrm_q_table[64];
+  unsigned short luma_q_table[QUANT_TABLE_SIZE];
+  unsigned short chrm_q_table[QUANT_TABLE_SIZE];
 
   unsigned short x_length;
   unsigned short y_length;
@@ -75,14 +83,9 @@ typedef struct _decode_context
   unsigned short x_density;
   unsigned short y_density;
 
-  struct // TODO(kaiyen): Make this a separate static global? Seems kinda worthless.
-  {
-    unsigned char major;
-    unsigned char minor;
-  } jfif_ver;
-
   unsigned char density_units;
   unsigned char bits_per_sample;
+  unsigned char num_components;
 
 } decode_context_t;
 

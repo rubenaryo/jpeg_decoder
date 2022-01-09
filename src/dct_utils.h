@@ -6,11 +6,13 @@ Author: kaiyen
 #ifndef DCT_UTILS_H
 #define DCT_UTILS_H
 
-#include "decoder.h"
+#include "huffman.h"
 
 void init_inverse_dct_table(unsigned char precision);
 
-// Does inverse DCT on block, which is the start of an 8x8 block of cosine-ified image data.
-void do_inverse_dct(unsigned char* block, decode_context_t* ctx);
+// Converts a raw binary block into an organized dct block, stored in the provided scratch_block.
+// Note: It's up to the caller to provide the scratch_block buffer. Assumes non-NULL.
+unsigned bits_to_dct_block(unsigned char*const block, const huff_node_t** huff_tables, unsigned* scratch_block, unsigned* prev_dc_val);
 
 #endif
+

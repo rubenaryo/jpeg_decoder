@@ -5,7 +5,10 @@ Author: kaiyen
 ---------------------------------------------------------------------------*/
 #include "huffman.h"
 
+#include "utils.h"
+
 #include <stdio.h>
+#include <stdlib.h>
 
 #define ENABLE_HT_LOG 0
 
@@ -74,6 +77,7 @@ bool huff_table_insert(huff_node_t** root, const unsigned char code_len, unsigne
   return false;
 }
 
+#if 0
 unsigned char huff_table_lookup(huff_node_t* root, const unsigned code, const unsigned code_len, const unsigned cur_shift)
 {
   if (root == NULL)
@@ -99,6 +103,37 @@ unsigned char huff_table_lookup(huff_node_t* root, const unsigned code, const un
     return huff_table_lookup(root->right, code, code_len, cur_shift + 1);
   }
 }
+#endif
+
+unsigned char huff_table_lookup(const huff_node_t* root, const unsigned char* const block, unsigned* offset)
+{
+  if (root == NULL)
+  {
+    printf("FOUND NULL. offset: %d\n", *offset);
+    return 0x0;
+  }
+
+  // Success case
+  if (root && root->left == NULL && root->right == NULL)
+  {
+    printf("SUCCESS: val:0x%X, offset: %d\n", root->val, *offset);
+    return root->val;
+  }
+
+  int bit = read_stream(block, *offset, 1);
+  (*offset)++;
+
+  if (bit == 0)
+  {
+    printf("Going Left. offset:%d\n", *offset);
+    return huff_table_lookup(root->left, block, offset);
+  }
+  else
+  {
+    printf("Going Right. offset:%d\n", *offset);
+    return huff_table_lookup(root->right, block, offset);
+  }
+}
 
 void huff_table_cleanup(huff_node_t* root)
 {
@@ -109,6 +144,8 @@ void huff_table_cleanup(huff_node_t* root)
 
   huff_table_cleanup(root->left);
   huff_table_cleanup(root->right);
+
+  root->left = root->right = NULL;
 
   free(root);
 }
