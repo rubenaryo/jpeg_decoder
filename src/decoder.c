@@ -250,7 +250,7 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
     {
       if (!huff_table_insert(&true_root, code_len, 0, ht_items[item_counter++]))
       {
-        printf("ERROR: Failed to build huff table. val:%d\n", ht_items[item_counter++]);
+        printf("ERROR: Failed to build huffman table. val:%d\n", ht_items[item_counter++]);
       }
     }
   }
@@ -260,7 +260,7 @@ static unsigned short process_func_huffman_table(unsigned char* img_buf)
     printf("Storing Luma Huff Table %d into the Decoder Context.\n", ht_type);
     ctx.huffman_tables_luma[ht_type] = true_root;
   }
-  else
+  else // Chroma
   {
     printf("Storing Chroma Huff Table %d into the Decoder Context.\n", ht_type);
     ctx.huffman_tables_chroma[ht_type] = true_root;
@@ -277,7 +277,6 @@ static unsigned short process_func_start_of_scan(unsigned char* img_buf)
   printf("(Header Size: %d, ", sos_header_len);
 
   // Process SOS header: Selectors and Tables
-
   if (sos_header_len != 12)
   {
     printf("\nWARNING: Something weird is going on. %d\n", sos_header_len);
@@ -363,6 +362,7 @@ static unsigned short process_func_end_of_image(unsigned char* img_buf)
   // Cleanup the decode context
   for (unsigned char i = 0; i != 2; ++i)
   {
+    // Right now only the huffman tables are on the heap.
     if (ctx.huffman_tables_luma[i])
       huff_table_cleanup(ctx.huffman_tables_luma[i]);
 
