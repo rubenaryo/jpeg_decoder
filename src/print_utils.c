@@ -136,7 +136,8 @@ void print_block(const char* header, const char* elem_fmt, void* block, size_t b
     sizeof(int)
   };
 
-  if (header == NULL || elem_fmt == NULL || block == NULL || block_side_len == 0 || type < 0 || type > PT_COUNT)
+  // Guard Usage
+  if (elem_fmt == NULL || block == NULL || block_side_len == 0 || type < 0 || type > PT_COUNT)
     return;
 
   print_elem_func_t print_func = PT_FUNCS[type];
@@ -144,7 +145,10 @@ void print_block(const char* header, const char* elem_fmt, void* block, size_t b
 
   const void* block_it = NULL;
 
-  printf("\n%s:\n", header);
+  // Print header, if it was passed in.
+  if (header != NULL)
+    printf("\n%s:\n", header);
+
   for (size_t offset, j, i = 0; i != block_side_len; ++i)
   {
     putchar(' ');

@@ -111,7 +111,6 @@ static unsigned short process_func_quant_table(unsigned char* img_buf)
   unsigned char dest = qt_info & QT_ID_MASK;
   unsigned char precision = (qt_info & QT_PRECISION_MASK) >> 4;
 
-  printf("qt_info:\t0x%02X\n", qt_info);
   if (dest == 0x0)
   {
     dest_table = ctx.luma_q_table;

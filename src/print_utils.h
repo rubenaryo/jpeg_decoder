@@ -8,7 +8,7 @@ Author: kaiyen
 
 #include <stddef.h>
 
-typedef enum _print
+typedef enum _print_type
 {
   PT_BYTE,
   PT_SHORT,
